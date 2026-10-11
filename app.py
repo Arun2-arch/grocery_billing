@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import tempfile
 from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -18,7 +20,12 @@ DISCOUNT_TIERS = [(2000, 15), (1000, 10), (500, 5)]
 
 app = Flask(__name__)
 app.secret_key = "replace-this-with-a-random-secret-key"
-app.config["DATABASE"] = str(Path(__file__).with_name("grocery.db"))
+default_database = (
+    Path(tempfile.gettempdir()) / "grocery.db"
+    if os.environ.get("VERCEL")
+    else Path(__file__).with_name("grocery.db")
+)
+app.config["DATABASE"] = os.environ.get("DATABASE_PATH", str(default_database))
 
 SAMPLE_PRODUCTS = [
     ("Rice", 60.00, 100, "kg"),
@@ -621,10 +628,8 @@ def api_create_bill():
     except ValueError as error:
         return jsonify(error=str(error)), 400
     except Exception:
-    app.logger.exception("Failed to save bill")
-    return jsonify(
-        error="The bill could not be saved. Please try again."
-    ), 500
+        app.logger.exception("Failed to save bill")
+        return jsonify(error="The bill could not be saved. Please try again."), 500
     return jsonify(redirect=url_for("invoice", bill_id=bill_id)), 201
 
 
